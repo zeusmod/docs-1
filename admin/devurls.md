@@ -10,7 +10,8 @@ set up Dev URLs, an administrator must configure and enable Dev URL usage.
 ## Before You Proceed
 
 You must own a wildcard DNS record for your custom domain name to enable and use
-Dev URLs with Coder.
+dev URLs with Coder. You will also need to add
+[SSL Certificates](https://coder.com/docs/guides/ssl-certificates) with Coder.
 
 ## Enabling the Use of Dev URLs
 
