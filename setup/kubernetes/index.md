@@ -1,13 +1,21 @@
 ---
 title: Kubernetes
-description: Learn how to set up a K8 cluster for your Coder deployment.
+description: Learn how to set up a Kubernetes cluster for your Coder deployment.
 ---
 
-You can install and deploy Coder onto any Kubernetes cluster (version 1.13.7+)
-that meets the [requirements](../requirements.md).
+You can deploy Coder into any [compatible Kubernetes cluster]. We recommend
+following the [Kubernetes upstream version support policy] in order to receive
+applicable fixes, including security fixes, from the project maintainers.
 
-To help you get up and running, Coder offers the following deployment guides (if
-you're all set up with a Kubernetes cluster, please proceed to
-[Installation](../installation.md)):
+[compatible kubernetes cluster]: ../requirements.md
+[kubernetes upstream version support policy]:
+  https://kubernetes.io/docs/setup/release/version-skew-policy/
+
+This section contains guides for creating a compatible cluster on common
+platforms, including Microsoft Azure, Google Cloud Platform, and Amazon Web
+Services. If you already have a Kubernetes cluster, you may wish to skip to the
+[installation guide].
+
+[installation guide]: ../installation.md
 
 <children></children>
