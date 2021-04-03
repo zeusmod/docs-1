@@ -30,7 +30,7 @@ can be used.
 - [Docker registry](https://hub.docker.com/_/registry)
 - [DNS server](https://coredns.io) or [HostAliases](https://kubernetes.io/docs/concepts/services-networking/add-entries-to-pod-etc-hosts-with-host-aliases/) patched in
 - [Certificate authority](https://github.com/activecm/docker-ca/blob/master/Dockerfile)
-  or [self-signed certificates](#)
+  or [self-signed certificates](#self-signed-certificate-for-the-registry)
 
 ## Step 1: Pull all Coder resources into your air-gapped environment
 
@@ -62,14 +62,22 @@ platform images are hosted in Coder's Docker Hub repo.
 
    [dashboard](https://hub.docker.com/r/coderenvs/dashboard)
 
-   [nginx-ingress-controller](https://quay.io/kubernetes-ingress-controller/nginx-ingress-controller)
-
    You can pull each of these images from their `coderenvs/<img-name>:<version>`
    registry location using the image's name and Coder version:
 
    ```console
    docker pull coderenvs/coder-service:<version>
    ```
+
+   Additional images may be needed to configure and run workspaces:
+
+   [nginx-ingress-controller](https://quay.io/kubernetes-ingress-controller/nginx-ingress-controller)
+
+   [enterprise-node](https://hub.docker.com/r/codercom/enterprise-node)
+
+   [enterprise-intellij](https://hub.docker.com/r/codercom/enterprise-intellij)
+
+   [ubuntu](https://hub.docker.com/_/ubuntu) as a base image
 
 1. Tag and push all of the images that you've downloaded in the previous step to
    your internal registry; this registry must be accessible from your air-gapped
@@ -143,8 +151,8 @@ Get the images such as the nginx-ingress-controller and coderenv/* listed above.
 
 ```bash
 docker pull quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.26.1
-docker tag quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.26.1 $REGISTRY_DOMAINNAME/nginx-ingress-controller:0.26.1
-docker push $REGISTRY_DOMAINNAME/nginx-ingress-controller:0.26.1
+docker tag quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.26.1 $REGISTRY_DOMAIN_NAME/nginx-ingress-controller:0.26.1
+docker push $REGISTRY_DOMAIN_NAME/nginx-ingress-controller:0.26.1
 ```
 
 ### Node configurations
@@ -155,18 +163,18 @@ spots depending on linux distribution and container runtime.
 
 ```plaintext
 /usr/local/share/ca-certificates/registry.crt
-/etc/docker/certs.d/${REGISTRY_DOMAINNAME}/ca.crt
+/etc/docker/certs.d/${REGISTRY_DOMAIN_NAME}/ca.crt
 /etc/ssl/certs/registry.crt
 /etc/pki/tls/registry.crt
 ```
 
 Containerd resisted the system certificate update so the below command patches in 
-an untrusted certificat for images coming from the local registry domain.
+an untrusted certificate for images coming from the local registry domain.
 
 ```bash
 update-ca-certificates
 cat <<EOT >> /etc/containerd/config.toml
-[plugins."io.containerd.grpc.v1.cri".registry.configs."$REGISTRY_DOMAINNAME".tls]
+[plugins."io.containerd.grpc.v1.cri".registry.configs."$REGISTRY_DOMAIN_NAME".tls]
   insecure_skip_verify = true
 EOT
 systemctl restart containerd
@@ -176,7 +184,7 @@ Since each node needs to have this same thing run on it, it needs to be baked in
 the image or run as an init script whenever adding a new node to the cluster. This
 isn't necessary on master nodes, just those that will be scheduling the Coder images.
 
-### Helm chart `certs` directory
+### Helm chart certs secret values
 
 Coder backend validates images and pulls tags using API calls so the system needs 
 to so a certificate issue will prevent adding images. If a certificate authority 
@@ -191,7 +199,7 @@ the `key` if the following command is used.
 kubectl -n coder create secret generic local-registry-cert --from-file=/certs
 ```
 
-If the `-out` argument on the openssl command to generate the certificates was 
+If the `-out` argument on the OpenSSL command to generate the certificates was 
 changed or the certificate was moved, adjust the `--from-file=` argument.
 
 To check the secret to make sure it looks right, use this command: 
@@ -207,7 +215,7 @@ end of the command above.
 certs:
   secret:
     name: "local-registry-cert"
-    key: "registy.crt"
+    key: "registry.crt"
 ```
 
 ## Resolve registry with cluster DNS or hostAliases
@@ -219,7 +227,7 @@ If the registry is on 10.0.0.2, something like this should be added to the node
 configuration script started a few sections back.
 
 ```bash
-echo "10.0.0.2  $REGISTRY_DOMAIN" >> /etc/hosts
+echo "10.0.0.2  $REGISTRY_DOMAIN_NAME" >> /etc/hosts
 ```
 
 This may not help the containers within the cluster since some Kubernetes DNS
@@ -232,6 +240,32 @@ ce-manager deployment.  It goes at the same indent level as `containers:`.
 ```yaml
       hostAliases:
       - hostnames:
-        - $REGISTRY_DNSNAME.com
+        - $REGISTRY_DOMAIN_NAME
         ip: 10.0.0.2
+```
+
+## Ingress image adjustment
+
+When making any change to the helm chart, the best approach is to extract the
+tgz that comes from the `helm pull` command. The extracted files can be modified
+and saved to a git repository for future update differentials.
+
+Once inside the extracted coder helm chart directory, you will find the
+`templates/ingress.yaml` file only has one instance of `image:`. Replace the image
+reference with the local `registry/name:tag` format.
+
+## Installing from an extracted helm chart
+
+To install from an extracted helm chart, you simply replace the `repo/chart` or
+`coder.tgz` path with a period. Run the command below from inside the directory.
+
+```bash
+helm install --wait --atomic --debug --namespace coder coder . \
+   --set cemanager.image=$REGISTRY_DOMAIN_NAME/coderenvs/coder-service:1.17.2 \
+   --set envproxy.image=$REGISTRY_DOMAIN_NAME/coderenvs/coder-service:1.17.2 \
+   --set envbox.image=$REGISTRY_DOMAIN_NAME/coderenvs/envbox:1.17.2 \
+   --set envbuilder.image=$REGISTRY_DOMAIN_NAME/coderenvs/envbuilder:1.17.2 \
+   --set timescale.image=$REGISTRY_DOMAIN_NAME/coderenvs/timescale:1.17.2 \
+   --set dashboard.image=$REGISTRY_DOMAIN_NAME/coderenvs/dashboard:1.17.2 \
+   -f registry-cert-values.yml
 ```
