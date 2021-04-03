@@ -23,12 +23,14 @@ dependencies:
 - [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 - [helm](https://helm.sh/docs/intro/install/)
 
-In the same network as the Kubernetes cluster that will run Coder, additional 
-services need to be configured. Links go to suggestions but many other options 
+In the same network as the Kubernetes cluster that will run Coder, additional
+services need to be configured. Links go to suggestions but many other options
 can be used.
 
 - [Docker registry](https://hub.docker.com/_/registry)
-- [DNS server](https://coredns.io) or [HostAliases](https://kubernetes.io/docs/concepts/services-networking/add-entries-to-pod-etc-hosts-with-host-aliases/) patched in
+- [DNS server](https://coredns.io) or
+  [HostAliases](https://kubernetes.io/docs/concepts/services-networking/add-entries-to-pod-etc-hosts-with-host-aliases/)
+  patched in
 - [Certificate authority](https://github.com/activecm/docker-ca/blob/master/Dockerfile)
   or [self-signed certificates](#self-signed-certificate-for-the-registry)
 
@@ -113,18 +115,19 @@ marketplace, allowing your developers to utilize whitelisted IDE extensions
 within your air-gapped environment. For additional details, see
 [Extensions](../admin/environment-management/extensions.md).
 
-## Related infrastructure 
+## Related infrastructure
 
 If the network already has a certificate authority, domain name service, and
-docker registry, the content below is unnecessary. The code snippets are
-subject to be outdated since they are all other software packages that Coder
-does not control or distribute.
+docker registry, the content below is unnecessary. The code snippets are subject
+to be outdated since they are all other software packages that Coder does not
+control or distribute.
 
-### Self-signed certificate for the registry 
+### Self-signed certificate for the registry
 
-This can be used in any environment but it's required for air-gapped installations. 
+This can be used in any environment but it's required for air-gapped
+installations.
 
-When creating the registry, create a certificate using a command like: 
+When creating the registry, create a certificate using a command like:
 
 ```bash
 export REGISTRY_DOMAINNAME=registry.local
@@ -134,9 +137,9 @@ openssl req \
     -x509 -days 365 -out /certs/registry.crt
 ```
 
-When it asks for the "Common Name [CN]: " this value must match what you set in DNS. 
-For the volume mounted at `/var/lib/registry` make sure it can store 10+ GB for just 
-Coder images. 
+When it asks for the "Common Name [CN]: " this value must match what you set in
+DNS. For the volume mounted at `/var/lib/registry` make sure it can store 10+ GB
+for just Coder images.
 
 ```bash
 docker run -d -p 443:5000 \
@@ -147,7 +150,8 @@ docker run -d -p 443:5000 \
     registry:2
 ```
 
-Get the images such as the nginx-ingress-controller and coderenv/* listed above.
+Get the images such as the nginx-ingress-controller and coderenv/\* listed
+above.
 
 ```bash
 docker pull quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.26.1
@@ -157,9 +161,9 @@ docker push $REGISTRY_DOMAIN_NAME/nginx-ingress-controller:0.26.1
 
 ### Node configurations
 
-For the Kubernetes node to accept the certificate, and different software packages 
-need to be told to trust that registry.crt file. Put that certificate in various 
-spots depending on linux distribution and container runtime.
+For the Kubernetes node to accept the certificate, and different software
+packages need to be told to trust that registry.crt file. Put that certificate
+in various spots depending on linux distribution and container runtime.
 
 ```plaintext
 /usr/local/share/ca-certificates/registry.crt
@@ -168,8 +172,8 @@ spots depending on linux distribution and container runtime.
 /etc/pki/tls/registry.crt
 ```
 
-Containerd resisted the system certificate update so the below command patches in 
-an untrusted certificate for images coming from the local registry domain.
+Containerd resisted the system certificate update so the below command patches
+in an untrusted certificate for images coming from the local registry domain.
 
 ```bash
 update-ca-certificates
@@ -180,35 +184,38 @@ EOT
 systemctl restart containerd
 ```
 
-Since each node needs to have this same thing run on it, it needs to be baked into 
-the image or run as an init script whenever adding a new node to the cluster. This
-isn't necessary on master nodes, just those that will be scheduling the Coder images.
+Since each node needs to have this same thing run on it, it needs to be baked
+into the image or run as an init script whenever adding a new node to the
+cluster. This isn't necessary on master nodes, just those that will be
+scheduling the Coder images.
 
 ### Helm chart certs secret values
 
-Coder backend validates images and pulls tags using API calls so the system needs 
-to so a certificate issue will prevent adding images. If a certificate authority 
-is present in the network, the root certificate may need to be added this way.
+Coder backend validates images and pulls tags using API calls so the system
+needs to so a certificate issue will prevent adding images. If a certificate
+authority is present in the network, the root certificate may need to be added
+this way.
 
-For a self-signed certificate to be passed into the Coder images a secret needs to
-be created and then referenced in the chart. The secret is a created from a directory
-with a single file in it. The directory name is irrelevant and the filename becomes 
-the `key` if the following command is used. 
+For a self-signed certificate to be passed into the Coder images a secret needs
+to be created and then referenced in the chart. The secret is a created from a
+directory with a single file in it. The directory name is irrelevant and the
+filename becomes the `key` if the following command is used.
 
 ```bash
 kubectl -n coder create secret generic local-registry-cert --from-file=/certs
 ```
 
-If the `-out` argument on the OpenSSL command to generate the certificates was 
+If the `-out` argument on the OpenSSL command to generate the certificates was
 changed or the certificate was moved, adjust the `--from-file=` argument.
 
-To check the secret to make sure it looks right, use this command: 
+To check the secret to make sure it looks right, use this command:
 
 ```bash
 kubectl -n coder get secret local-registry-cert -o yaml
 ```
 
-This snippet can be added to the helm command by putting it in a yaml file like `registry-cert-values.yml` and then adding `-f registry-cert-values.yml` to the 
+This snippet can be added to the helm command by putting it in a yaml file like
+`registry-cert-values.yml` and then adding `-f registry-cert-values.yml` to the
 end of the command above.
 
 ```yaml
@@ -218,7 +225,7 @@ certs:
     key: "registry.crt"
 ```
 
-## Resolve registry with cluster DNS or hostAliases
+### Resolve registry with cluster DNS or hostAliases
 
 Without a customer domain name server, the nodes need to have their host file
 set to have the `$REGISTRY_DOMAIN` and static IP address of the local registry.
@@ -231,30 +238,30 @@ echo "10.0.0.2  $REGISTRY_DOMAIN_NAME" >> /etc/hosts
 ```
 
 This may not help the containers within the cluster since some Kubernetes DNS
-services forward directly out of the cluster. 
+services forward directly out of the cluster.
 
 If the hosts file on the node isn't being heeded by pods, a work-around is to
-extract the helm chart from `coder-X.Y.Z.tgz` (retrieved above) and patch the 
-ce-manager deployment.  It goes at the same indent level as `containers:`.
+extract the helm chart from `coder-X.Y.Z.tgz` (retrieved above) and patch the
+ce-manager deployment. It goes at the same indent level as `containers:`.
 
 ```yaml
-      hostAliases:
-      - hostnames:
-        - $REGISTRY_DOMAIN_NAME
-        ip: 10.0.0.2
+hostAliases:
+  - hostnames:
+      - $REGISTRY_DOMAIN_NAME
+    ip: 10.0.0.2
 ```
 
-## Ingress image adjustment
+### Ingress image adjustment
 
 When making any change to the helm chart, the best approach is to extract the
 tgz that comes from the `helm pull` command. The extracted files can be modified
 and saved to a git repository for future update differentials.
 
 Once inside the extracted coder helm chart directory, you will find the
-`templates/ingress.yaml` file only has one instance of `image:`. Replace the image
-reference with the local `registry/name:tag` format.
+`templates/ingress.yaml` file only has one instance of `image:`. Replace the
+image reference with the local `registry/name:tag` format.
 
-## Installing from an extracted helm chart
+### Installing from an extracted helm chart
 
 To install from an extracted helm chart, you simply replace the `repo/chart` or
 `coder.tgz` path with a period. Run the command below from inside the directory.
