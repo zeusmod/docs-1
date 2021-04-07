@@ -63,7 +63,10 @@
         { "path": "./setup/installation.md" },
         { "path": "./setup/configuration.md" },
         { "path": "./setup/licensing.md" },
-        { "path": "./setup/air-gapped.md" },
+        {
+          "path": "./setup/air-gapped/index.md",
+          "children": [{ "path": "./setup/air-gapped/infrastrucutre.md" }]
+        },
         { "path": "./setup/updating.md" }
       ]
     },
